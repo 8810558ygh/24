@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>24点游戏</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    input {
+      padding: 10px;
+      margin: 5px;
+    }
+
+    #result {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+
+    #answers {
+      font-size: 20px;
+      margin-top: 20px;
+    }
+
+    #number-display {
+      font-size: 24px;
+      margin: 20px 0;
+    }
+
+   .button-row {
+      display: flex;
+      justify-content: center;
+    }
+
+   .card {
+      display: inline-block;
+      width: 75px;
+      height: 120px;
+      border: 1px solid #000;
+      margin: 5px;
+      text-align: center;
+      background-color: white;
+      position: relative;
+      font-family: 'Arial', sans-serif;
+    }
+
+   .card:before {
+      content: attr(data-value);
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      font-size: 14px;
+    }
+
+   .card:after {
+      content: attr(data-value);
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      font-size: 14px;
+      transform: rotate(180deg);
+    }
+
+   .spade:before,
+   .spade:after,
+   .club:before,
+   .club:after {
+      color: black;
+    }
+
+   .heart:before,
+   .heart:after,
+   .diamond:before,
+   .diamond:after {
+      color: red;
+    }
+
+    /* 自定义各个牌面的图案样式，这里以A为例，其他牌面类似扩展 */
+   .ace.spade:before,
+   .ace.spade:after {
+      content: "A♠";
+    }
+   .ace.heart:before,
+   .ace.heart:after {
+      content: "A♥";
+    }
+   .ace.club:before,
+   .ace.club:after {
+      content: "A♣";
+    }
+   .ace.diamond:before,
+   .ace.diamond:after {
+      content: "A♦";
+    }
+  </style>
+</head>
+
+<body>
+  <h1>24点游戏</h1>
+  <button id="startButton" onclick="startGame()">开始游戏</button>
+  <button id="dealCardButton" onclick="dealCard()" style="display: none;">发牌</button>
+  <button id="inputNumberButton" onclick="inputCustomNumbers()" style="display: none;">输入数字</button>
+  <input type="text" id="answerInput" placeholder="请输入答案" style="display: none;">
+  <div class="button-row">
+    <button id="addButton" onclick="addSymbol('+')" style="display: none;">+</button>
+    <button id="subButton" onclick="addSymbol('-')" style="display: none;">-</button>
+    <button id="mulButton" onclick="addSymbol('*')" style="display: none;">*</button>
+    <button id="divButton" onclick="addSymbol('/')" style="display: none;">/</button>
+    <button id="leftBracketButton" onclick="addSymbol('(')" style="display: none;">(</button>
+    <button id="rightBracketButton" onclick="addSymbol(')')" style="display: none;">)</button>
+  </div>
+  <div class="button-row">
+    <button id="num1Button" onclick="addSymbol('1')" style="display: none;">1</button>
+    <button id="num2Button" onclick="addSymbol('2')" style="display: none;">2</button>
+    <button id="num3Button" onclick="addSymbol('3')" style="display: none;">3</button>
+  </div>
+  <div class="button-row">
+    <button id="num4Button" onclick="addSymbol('4')" style="display: none;">4</button>
+    <button id="num5Button" onclick="addSymbol('5')" style="display: none;">5</button>
+    <button id="num6Button" onclick="addSymbol('6')" style="display: none;">6</button>
+  </div>
+  <div class="button-row">
+    <button id="num7Button" onclick="addSymbol('7')" style="display: none;">7</button>
+    <button id="num8Button" onclick="addSymbol('8')" style="display: none;">8</button>
+    <button id="num9Button" onclick="addSymbol('9')" style="display: none;">9</button>
+  </div>
+  <div class="button-row">
+    <button id="clearButton" onclick="clearInput()" style="display: none;">清空</button>
+    <button id="num0Button" onclick="addSymbol('0')" style="display: none;">0</button>
+    <button id="undoButton" onclick="undoInput()" style="display: none;">撤回</button>
+  </div>
+  <button id="confirmButton" onclick="checkAnswer()" style="display: none;">确认</button>
+  <button id="showAnswerButton" onclick="showAnswers()" style="display: none;">显示答案</button>
+  <div id="number-display"></div>
+  <div id="result"></div>
+  <div id="answers"></div>
+
+  <script>
+    let currentNumbers = [];
+    const suits = ['♥', '♦', '♣', '♠'];
+    let inputHistory = [];
+
+    function generateRandomNumbers() {
+      const numbers = [];
+      for (let i = 0; i < 4; i++) {
+        numbers.push(Math.floor(Math.random() * 13) + 1);
+      }
+      return numbers;
+    }
+
+    function permute(nums) {
+      const result = [];
+      if (nums.length === 1) {
+        return [nums];
+      }
+      nums.forEach((num, index) => {
+        const remaining = [...nums.slice(0, index), ...nums.slice(index + 1)];
+        const perms = permute(remaining);
+        perms.forEach(perm => {
+          result.push([num, ...perm]);
+        });
+      });
+      return result;
+    }
+
+    function calculateExpressions(nums) {
+      const operators = ['+', '-', '*', '/'];
+      const permutations = permute(nums);
+      const validExpressions = [];
+      for (const permutation of permutations) {
+        for (const op1 of operators) {
+          for (const op2 of operators) {
+            for (const op3 of operators) {
+              const expression1 = `((${permutation[0]}${op1}${permutation[1]})${op2}${permutation[2]})${op3}${permutation[3]}`;
+              const expression2 = `(${permutation[0]}${op1}(${permutation[1]}${op2}${permutation[2]}))${op3}${permutation[3]}`;
+              const expression3 = `(${permutation[0]}${op1}${permutation[1]})${op2}(${permutation[2]}${op3}${permutation[3]})`;
+              const expression4 = `${permutation[0]}${op1}(((${permutation[1]}${op2}${permutation[2]})${op3}${permutation[3]}))`;
+              const expression5 = `${permutation[0]}${op1}(${permutation[1]}${op2}(${permutation[2]}${op3}${permutation[3]}))`;
+              const expressions = [expression1, expression2, expression3, expression4, expression5];
+              for (const expression of expressions) {
+                try {
+                  if (eval(expression) === 24) {
+                    validExpressions.push(expression);
+                  }
+                } catch (error) {
+                  // 忽略除零等错误
+                }
+              }
+            }
+          }
+        }
+      }
+      return validExpressions;
+    }
+
+    function startGame() {
+      document.getElementById('startButton').style.display = 'none';
+      document.getElementById('dealCardButton').style.display = 'block';
+      document.getElementById('inputNumberButton').style.display = 'block';
+      document.getElementById('answerInput').style.display = 'block';
+      document.getElementById('addButton').style.display = 'block';
+      document.getElementById('subButton').style.display = 'block';
+      document.getElementById('mulButton').style.display = 'block';
+      document.getElementById('divButton').style.display = 'block';
+      document.getElementById('leftBracketButton').style.display = 'block';
+      document.getElementById('rightBracketButton').style.display = 'block';
+      document.getElementById('confirmButton').style.display = 'block';
+      document.getElementById('showAnswerButton').style.display = 'block';
+      document.getElementById('num1Button').style.display = 'block';
+      document.getElementById('num2Button').style.display = 'block';
+      document.getElementById('num3Button').style.display = 'block';
+      document.getElementById('num4Button').style.display = 'block';
+      document.getElementById('num5Button').style.display = 'block';
+      document.getElementById('num6Button').style.display = 'block';
+      document.getElementById('num7Button').style.display = 'block';
+      document.getElementById('num8Button').style.display = 'block';
+      document.getElementById('num9Button').style.display = 'block';
+      document.getElementById('num0Button').style.display = 'block';
+      document.getElementById('clearButton').style.display = 'block';
+      document.getElementById('undoButton').style.display = 'block';
+    }
+
+    function dealCard() {
+      currentNumbers = generateRandomNumbers();
+      const numberDisplay = document.getElementById('number-display');
+      numberDisplay.innerHTML = '';
+      currentNumbers.forEach(num => {
+        let cardValue;
+        if (num === 11) {
+          cardValue = 'J';
+        } else if (num === 12) {
+          cardValue = 'Q';
+        } else if (num === 13) {
+          cardValue = 'K';
+        } else if (num === 1) {
+          cardValue = 'A';
+        } else {
+          cardValue = num.toString();
+        }
+        const suit = suits[Math.floor(Math.random() * suits.length)];
+        const cardElement = document.createElement('div');
+        cardElement.classList.add('card');
+        if (suit === '♥') {
+          cardElement.classList.add('heart');
+        } else if (suit === '♦') {
+          cardElement.classList.add('diamond');
+        } else if (suit === '♣') {
+          cardElement.classList.add('club');
+        } else {
+          cardElement.classList.add('spade');
+        }
+        if (num === 1) {
+          cardElement.classList.add('ace');
+        }
+        // 其他牌面也可以类似添加特定类名来精准控制样式
+        cardElement.setAttribute('data-value', `${cardValue}${suit}`);
+        numberDisplay.appendChild(cardElement);
+      });
+      document.getElementById('result').textContent = "";
+      document.getElementById('answers').textContent = "";
+      document.getElementById('answerInput').value = "";
+      inputHistory = [];
+    }
+
+    function inputCustomNumbers() {
+      const inputStr = prompt("请输入四个1到50的数字，用空格分隔", "");
+      if (inputStr) {
+        const inputNums = inputStr.split(' ').map(Number);
+        if (inputNums.length === 4 && inputNums.every(num => num >= 1 && num <= 50)) {
+          currentNumbers = inputNums;
+          const numberDisplay = document.getElementById('number-display');
+          numberDisplay.innerHTML = '';
+          currentNumbers.forEach(num => {
+            numberDisplay.textContent += num + ', ';
+          });
+          numberDisplay.textContent = numberDisplay.textContent.slice(0, -2);
+          document.getElementById('result').textContent = "";
+          document.getElementById('answers').textContent = "";
+          document.getElementById('answerInput').value = "";
+          inputHistory = [];
+        } else {
+          alert("输入格式错误，请输入四个1到50的数字，用空格分隔");
+        }
+      }
+    }
+
+    function addSymbol(symbol) {
+      const input = document.getElementById('answerInput');
+      const currentValue = input.value;
+      input.value += symbol;
+      inputHistory.push(currentValue);
+    }
+
+    function checkAnswer() {
+      const input = document.getElementById('answerInput').value;
+      const inputDigits = [];
+      const regex = /\d+/g;
+      let match;
+      while ((match = regex.exec(input))!== null) {
+        inputDigits.push(parseInt(match[0], 10));
+      }
+      const sortedInputDigits = inputDigits.sort((a, b) => a - b);
+      const sortedCurrentNumbers = currentNumbers.sort((a, b) => a - b);
+      try {
+        if (JSON.stringify(sortedInputDigits) === JSON.stringify(sortedCurrentNumbers) && eval(input) === 24) {
+          document.getElementById('result').textContent = '回答正确！';
+        } else {
+          document.getElementById('result').textContent = '回答错误，请再试一次。';
+        }
+      } catch (error) {
+          document.getElementById('result').textContent = '输入的表达式格式错误，请检查。';
+      }
+    }
+
+    function showAnswers() {
+      const validExpressions = calculateExpressions(currentNumbers);
+      const answersElement = document.getElementById('answers');
+      if (validExpressions.length > 0) {
+        answersElement.textContent = `满足条件的答案：${validExpressions.join('; ')}`;
+      } else {
+        answersElement.textContent = '不存在符合条件的答案';
+      }
+    }
+
+    function clearInput() {
+      const input = document.getElementById('answerInput');
+      input.value = "";
+      inputHistory = [];
+    }
+
+    function undoInput() {
+      const input = document.getElementById('answerInput');
+      if (inputHistory.length > 0) {
+        input.value = inputHistory.pop();
+      }
+    }
+  </script>
+</body>
+
+</html>
